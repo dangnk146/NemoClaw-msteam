@@ -107,7 +107,7 @@ RUN openclaw doctor --fix > /dev/null 2>&1 || true \
 # Ref: https://github.com/NVIDIA/NemoClaw/issues/514
 USER root
 RUN chown root:root /sandbox/.openclaw /sandbox/.openclaw/openclaw.json \
-    && chmod 755 /sandbox/.openclaw \
+    && chmod 1777 /sandbox/.openclaw \
     && chmod 444 /sandbox/.openclaw/openclaw.json
 USER sandbox
 
