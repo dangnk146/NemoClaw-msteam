@@ -1,0 +1,127 @@
+diff --git a/crates/openshell-server/src/grpc.rs b/crates/openshell-server/src/grpc.rs
+index fd4bf58..ef22592 100644
+--- a/crates/openshell-server/src/grpc.rs
++++ b/crates/openshell-server/src/grpc.rs
+@@ -1795,7 +1795,9 @@ impl OpenShell for OpenShellService {
+                 rejection_reasons.push("chunk missing rule_name".to_string());
+                 continue;
+             }
+-            if chunk.proposed_rule.is_none() {
++            // Config-change chunks (rule_name starts with "config:") don't
++            // need a proposed_rule — the config payload lives in rationale.
++            if chunk.proposed_rule.is_none() && !chunk.rule_name.starts_with("config:") {
+                 rejected += 1;
+                 rejection_reasons
+                     .push(format!("chunk '{}' missing proposed_rule", chunk.rule_name));
+@@ -1990,9 +1992,40 @@ impl OpenShell for OpenShellService {
+             port = chunk.port,
+             hit_count = chunk.hit_count,
+             prev_status = %chunk.status,
+-            "ApproveDraftChunk: merging rule into active policy"
++            "ApproveDraftChunk: processing"
+         );
+ 
++        // --- NemoClaw config-change approval (POC) ---
++        // Chunks whose rule_name starts with "config:" are config override
++        // requests, not network rules.  On approval, mark as approved and
++        // skip the network policy merge.  The NemoClaw host-side CLI picks
++        // up approved config chunks and writes them to the sandbox's
++        // overrides file.
++        if chunk.rule_name.starts_with("config:") {
++            info!(
++                sandbox_id = %sandbox_id,
++                chunk_id = %req.chunk_id,
++                rule_name = %chunk.rule_name,
++                "ApproveDraftChunk: config override approved (pending host-side apply)"
++            );
++
++            let now_ms =
++                current_time_ms().map_err(|e| Status::internal(format!("timestamp error: {e}")))?;
++            self.state
++                .store
++                .update_draft_chunk_status(&req.chunk_id, "approved", Some(now_ms))
++                .await
++                .map_err(|e| Status::internal(format!("update chunk status failed: {e}")))?;
++
++            self.state.sandbox_watch_bus.notify(&sandbox_id);
++
++            return Ok(Response::new(ApproveDraftChunkResponse {
++                policy_version: 0,
++                policy_hash: String::new(),
++            }));
++        }
++        // --- End NemoClaw config-change approval ---
++
+         // Merge the approved rule into the current policy (with optimistic retry).
+         let (version, hash) =
+             merge_chunk_into_policy(self.state.store.as_ref(), &sandbox_id, &chunk).await?;
+diff --git a/crates/openshell-tui/src/ui/sandbox_draft.rs b/crates/openshell-tui/src/ui/sandbox_draft.rs
+index 528d1c6..702f8b6 100644
+--- a/crates/openshell-tui/src/ui/sandbox_draft.rs
++++ b/crates/openshell-tui/src/ui/sandbox_draft.rs
+@@ -22,12 +22,12 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+ 
+     let title = if pending_count > 0 {
+         Line::from(vec![
+-            Span::styled(" Network Rules ", t.heading),
++            Span::styled(" Rules & Config ", t.heading),
+             Span::styled(format!(" {pending_count} pending "), t.badge),
+             Span::raw(" "),
+         ])
+     } else {
+-        Line::from(Span::styled(" Network Rules ", t.heading))
++        Line::from(Span::styled(" Rules & Config ", t.heading))
+     };
+ 
+     let mut block = Block::default()
+@@ -48,8 +48,9 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+ 
+     if app.draft_chunks.is_empty() {
+         let msg = Paragraph::new(
+-            "No network rules yet. Denied connections will \
+-             generate rules automatically.",
++            "No network rules or config changes yet. Denied connections \
++             generate rules automatically. Config changes appear when \
++             requested by the sandbox agent.",
+         )
+         .block(block)
+         .style(t.muted);
+@@ -111,15 +112,30 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+                 spans.push(Span::raw("  "));
+             }
+ 
+-            // Endpoint summary (host:port).
+-            let endpoint_str = chunk
+-                .proposed_rule
+-                .as_ref()
+-                .and_then(|r| r.endpoints.first())
+-                .map(|ep| format!("{}:{}", ep.host, ep.port))
+-                .unwrap_or_default();
++            // Config-change chunks (NemoClaw POC) use rule_name prefix "config:"
++            let is_config_chunk = chunk.rule_name.starts_with("config:");
+ 
+-            spans.push(Span::styled(&chunk.rule_name, name_style));
++            // Endpoint summary (host:port) — empty for config chunks.
++            let endpoint_str = if is_config_chunk {
++                String::new()
++            } else {
++                chunk
++                    .proposed_rule
++                    .as_ref()
++                    .and_then(|r| r.endpoints.first())
++                    .map(|ep| format!("{}:{}", ep.host, ep.port))
++                    .unwrap_or_default()
++            };
++
++            if is_config_chunk {
++                spans.push(Span::styled("CONFIG", t.status_warn));
++                spans.push(Span::styled("  ", t.muted));
++                // Show the config key (strip "config:" prefix)
++                let config_key = chunk.rule_name.strip_prefix("config:").unwrap_or(&chunk.rule_name);
++                spans.push(Span::styled(config_key, name_style));
++            } else {
++                spans.push(Span::styled(&chunk.rule_name, name_style));
++            }
+             if !endpoint_str.is_empty() {
+                 spans.push(Span::styled("  ", t.muted));
+                 spans.push(Span::styled(endpoint_str, t.accent));
