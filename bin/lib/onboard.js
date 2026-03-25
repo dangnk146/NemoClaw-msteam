@@ -574,7 +574,10 @@ async function createSandbox(gpu) {
 
   console.log(`  Creating sandbox '${sandboxName}' (this takes a few minutes on first run)...`);
   const chatUiUrl = process.env.CHAT_UI_URL || 'http://127.0.0.1:18789';
-  const envArgs = [`CHAT_UI_URL=${shellQuote(chatUiUrl)}`];
+  const envArgs = [
+    `CHAT_UI_URL=${shellQuote(chatUiUrl)}`,
+    `OPENCLAW_CONFIG_OVERRIDES_FILE=/sandbox/.openclaw-data/config-overrides.json5`,
+  ];
   if (process.env.NVIDIA_API_KEY) {
     envArgs.push(`NVIDIA_API_KEY=${shellQuote(process.env.NVIDIA_API_KEY)}`);
   }
