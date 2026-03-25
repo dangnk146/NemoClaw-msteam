@@ -1,3 +1,23 @@
+diff --git a/crates/openshell-core/build.rs b/crates/openshell-core/build.rs
+index f44cdc7..89eee5a 100644
+--- a/crates/openshell-core/build.rs
++++ b/crates/openshell-core/build.rs
+@@ -23,9 +23,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
+     // include tree.
+     // SAFETY: This is run at build time in a single-threaded build script context.
+     // No other threads are reading environment variables concurrently.
+-    #[allow(unsafe_code)]
+-    unsafe {
+-        env::set_var("PROTOC", protobuf_src::protoc());
++    // NemoClaw POC: use system protoc if PROTOC is already set.
++    if env::var("PROTOC").is_err() {
++        #[allow(unsafe_code)]
++        unsafe {
++            env::set_var("PROTOC", protobuf_src::protoc());
++        }
+     }
+ 
+     let proto_files = [
 diff --git a/crates/openshell-sandbox/src/grpc_client.rs b/crates/openshell-sandbox/src/grpc_client.rs
 index 5503637..cd4dc90 100644
 --- a/crates/openshell-sandbox/src/grpc_client.rs
@@ -29,7 +49,7 @@ index 5503637..cd4dc90 100644
      pub async fn report_policy_status(
          &self,
 diff --git a/crates/openshell-sandbox/src/lib.rs b/crates/openshell-sandbox/src/lib.rs
-index 493e4d2..9e6ce51 100644
+index 493e4d2..54fda4c 100644
 --- a/crates/openshell-sandbox/src/lib.rs
 +++ b/crates/openshell-sandbox/src/lib.rs
 @@ -617,6 +617,19 @@ pub async fn run_sandbox(
@@ -261,7 +281,7 @@ index 493e4d2..9e6ce51 100644
 +fn deep_merge_json(target: &mut serde_json::Map<String, serde_json::Value>, source: &serde_json::Map<String, serde_json::Value>) {
 +    for (key, value) in source {
 +        match (target.get_mut(key), value) {
-+            (Some(serde_json::Value::Object(ref mut t)), serde_json::Value::Object(s)) => {
++            (Some(serde_json::Value::Object(t)), serde_json::Value::Object(s)) => {
 +                deep_merge_json(t, s);
 +            }
 +            _ => {
