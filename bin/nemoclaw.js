@@ -190,12 +190,12 @@ function printGatewayLifecycleHint(output = "", sandboxName = "", writer = conso
     writer("  Try re-establishing the NemoClaw gateway/runtime first. If the sandbox is still unreachable, recreate just that sandbox with `nemoclaw onboard`.");
     return;
   }
-  if (/Connection refused|transport error/i.test(output)) {
+  if (/Connection refused|transport error/i.test(cleanOutput)) {
     writer(`  The sandbox '${sandboxName}' may still exist, but the current gateway/runtime is not reachable.`);
     writer("  Check `openshell status`, verify the active gateway, and retry.");
     return;
   }
-  if (/Missing gateway auth token|device identity required/i.test(output)) {
+  if (/Missing gateway auth token|device identity required/i.test(cleanOutput)) {
     writer("  The gateway is reachable, but the current auth or device identity state is not usable.");
     writer("  Verify the active gateway and retry after re-establishing the runtime.");
   }

@@ -368,6 +368,122 @@ describe("CLI dispatch", () => {
     expect(r.out.includes("verify the active gateway")).toBeTruthy();
   }, 25000);
 
+  it("matches ANSI-decorated gateway transport errors when printing lifecycle hints", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-ansi-transport-hint-"));
+    const localBin = path.join(home, "bin");
+    const registryDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(localBin, { recursive: true });
+    fs.mkdirSync(registryDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(registryDir, "sandboxes.json"),
+      JSON.stringify({
+        sandboxes: {
+          alpha: {
+            name: "alpha",
+            model: "test-model",
+            provider: "nvidia-prod",
+            gpuEnabled: false,
+            policies: [],
+          },
+        },
+        defaultSandbox: "alpha",
+      }),
+      { mode: 0o600 }
+    );
+    fs.writeFileSync(
+      path.join(localBin, "openshell"),
+      [
+        "#!/usr/bin/env bash",
+        "if [ \"$1\" = \"sandbox\" ] && [ \"$2\" = \"get\" ] && [ \"$3\" = \"alpha\" ]; then",
+        "  printf '\\033[31mError: trans\\033[0mport error: Connec\\033[33mtion refused\\033[0m\\n' >&2",
+        "  exit 1",
+        "fi",
+        "if [ \"$1\" = \"status\" ]; then",
+        "  echo 'Server Status'",
+        "  echo",
+        "  echo '  Gateway: openshell'",
+        "  echo '  Status: Disconnected'",
+        "  exit 0",
+        "fi",
+        "if [ \"$1\" = \"gateway\" ] && [ \"$2\" = \"info\" ] && [ \"$3\" = \"-g\" ] && [ \"$4\" = \"nemoclaw\" ]; then",
+        "  printf 'Gateway Info\\n\\n  Gateway: openshell\\n'",
+        "  exit 0",
+        "fi",
+        "if [ \"$1\" = \"gateway\" ] && [ \"$2\" = \"select\" ] && [ \"$3\" = \"nemoclaw\" ]; then",
+        "  exit 0",
+        "fi",
+        "exit 0",
+      ].join("\n"),
+      { mode: 0o755 }
+    );
+
+    const r = runWithEnv("alpha status", {
+      HOME: home,
+      PATH: `${localBin}:${process.env.PATH || ""}`,
+    }, 25000);
+
+    expect(r.code).toBe(0);
+    expect(r.out.includes("current gateway/runtime is not reachable")).toBeTruthy();
+  }, 25000);
+
+  it("matches ANSI-decorated gateway auth errors when printing lifecycle hints", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-ansi-auth-hint-"));
+    const localBin = path.join(home, "bin");
+    const registryDir = path.join(home, ".nemoclaw");
+    fs.mkdirSync(localBin, { recursive: true });
+    fs.mkdirSync(registryDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(registryDir, "sandboxes.json"),
+      JSON.stringify({
+        sandboxes: {
+          alpha: {
+            name: "alpha",
+            model: "test-model",
+            provider: "nvidia-prod",
+            gpuEnabled: false,
+            policies: [],
+          },
+        },
+        defaultSandbox: "alpha",
+      }),
+      { mode: 0o600 }
+    );
+    fs.writeFileSync(
+      path.join(localBin, "openshell"),
+      [
+        "#!/usr/bin/env bash",
+        "if [ \"$1\" = \"sandbox\" ] && [ \"$2\" = \"get\" ] && [ \"$3\" = \"alpha\" ]; then",
+        "  printf '\\033[31mMissing gateway auth\\033[0m token\\n' >&2",
+        "  exit 1",
+        "fi",
+        "if [ \"$1\" = \"status\" ]; then",
+        "  echo 'Server Status'",
+        "  echo",
+        "  echo '  Gateway: openshell'",
+        "  echo '  Status: Disconnected'",
+        "  exit 0",
+        "fi",
+        "if [ \"$1\" = \"gateway\" ] && [ \"$2\" = \"info\" ] && [ \"$3\" = \"-g\" ] && [ \"$4\" = \"nemoclaw\" ]; then",
+        "  printf 'Gateway Info\\n\\n  Gateway: openshell\\n'",
+        "  exit 0",
+        "fi",
+        "if [ \"$1\" = \"gateway\" ] && [ \"$2\" = \"select\" ] && [ \"$3\" = \"nemoclaw\" ]; then",
+        "  exit 0",
+        "fi",
+        "exit 0",
+      ].join("\n"),
+      { mode: 0o755 }
+    );
+
+    const r = runWithEnv("alpha status", {
+      HOME: home,
+      PATH: `${localBin}:${process.env.PATH || ""}`,
+    }, 25000);
+
+    expect(r.code).toBe(0);
+    expect(r.out.includes("Verify the active gateway and retry after re-establishing the runtime.")).toBeTruthy();
+  }, 25000);
+
   it("explains unrecoverable gateway trust rotation after restart", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-identity-drift-"));
     const localBin = path.join(home, "bin");
