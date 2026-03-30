@@ -187,9 +187,14 @@ Collect diagnostics for bug reports.
 Gathers system info, Docker state, gateway logs, and sandbox status into a summary or tarball.
 
 ```console
-$ nemoclaw debug [--quick]
-$ nemoclaw debug --output diagnostics.tar.gz
+$ nemoclaw debug [--quick] [--sandbox NAME] [--output PATH]
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--quick` | Collect minimal diagnostics only |
+| `--sandbox NAME` | Target a specific sandbox (default: auto-detect) |
+| `--output PATH` | Write diagnostics tarball to the given path |
 
 ### `nemoclaw uninstall`
 
