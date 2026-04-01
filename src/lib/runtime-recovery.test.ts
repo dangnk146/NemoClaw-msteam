@@ -71,10 +71,8 @@ describe("runtime recovery helpers", () => {
     expect(classifyGatewayStatus("Gateway: nemoclaw\nStatus: Connected").state).toBe("connected");
     expect(classifyGatewayStatus("Error:   × No active gateway").state).toBe("unavailable");
     expect(classifyGatewayStatus("").state).toBe("inactive");
-    // Note: "Disconnected" contains "Connected" as a substring, so it matches
-    // the Connected regex. This matches the original behavior.
     expect(classifyGatewayStatus("Gateway: nemoclaw\nStatus: Disconnected").state).toBe(
-      "connected",
+      "inactive",
     );
   });
 
