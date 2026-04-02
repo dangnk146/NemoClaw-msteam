@@ -9,8 +9,8 @@ const NOTICE_ACCEPT_FLAG = "--yes-i-accept-third-party-software";
 const NOTICE_ACCEPT_ENV = "NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE";
 const NOTICE_CONFIG_FILE = path.join(__dirname, "usage-notice.json");
 const OSC8_OPEN = "\u001B]8;;";
-const OSC8_CLOSE = "\u001B]8;;\u0007";
-const OSC8_TERM = "\u0007";
+const OSC8_CLOSE = "\u001B]8;;\u001B\\";
+const OSC8_TERM = "\u001B\\";
 
 function getUsageNoticeStateFile() {
   return path.join(process.env.HOME || os.homedir(), ".nemoclaw", "usage-notice.json");
@@ -59,11 +59,20 @@ function printUsageNotice(config = loadUsageNoticeConfig(), writeLine = console.
   writeLine(`  ${config.title}`);
   writeLine("  ──────────────────────────────────────────────────");
   for (const line of config.body || []) {
-    const renderedLine =
-      /^https?:\/\//.test(line) && supportsTerminalHyperlinks()
-        ? formatTerminalHyperlink(line, line)
-        : line;
-    writeLine(`  ${renderedLine}`);
+    writeLine(`  ${line}`);
+  }
+  for (const link of config.links || []) {
+    writeLine("");
+    const label =
+      supportsTerminalHyperlinks() && link?.url && link?.label
+        ? formatTerminalHyperlink(link.label, link.url)
+        : link?.label || "";
+    if (label) {
+      writeLine(`  ${label}`);
+    }
+    if (link?.url) {
+      writeLine(`  ${link.url}`);
+    }
   }
   writeLine("");
 }

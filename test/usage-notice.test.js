@@ -137,9 +137,10 @@ describe("usage notice", () => {
 
     expect(lines.join("\n")).toContain(
       formatTerminalHyperlink(
-        "https://docs.openclaw.ai/gateway/security",
+        "OpenClaw security guidance",
         "https://docs.openclaw.ai/gateway/security",
       ),
     );
+    expect(lines.join("\n")).toContain("https://docs.openclaw.ai/gateway/security");
   });
 });
