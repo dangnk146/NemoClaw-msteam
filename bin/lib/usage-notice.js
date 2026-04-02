@@ -8,6 +8,9 @@ const path = require("path");
 const NOTICE_ACCEPT_FLAG = "--yes-i-accept-third-party-software";
 const NOTICE_ACCEPT_ENV = "NEMOCLAW_ACCEPT_THIRD_PARTY_SOFTWARE";
 const NOTICE_CONFIG_FILE = path.join(__dirname, "usage-notice.json");
+const OSC8_OPEN = "\u001B]8;;";
+const OSC8_CLOSE = "\u001B]8;;\u0007";
+const OSC8_TERM = "\u0007";
 
 function getUsageNoticeStateFile() {
   return path.join(process.env.HOME || os.homedir(), ".nemoclaw", "usage-notice.json");
@@ -39,12 +42,28 @@ function saveUsageNoticeAcceptance(version) {
   fs.chmodSync(stateFile, 0o600);
 }
 
+function supportsTerminalHyperlinks() {
+  const tty = process.stderr?.isTTY || process.stdout?.isTTY;
+  if (!tty) return false;
+  if (process.env.NO_COLOR) return false;
+  if (process.env.TERM === "dumb") return false;
+  return true;
+}
+
+function formatTerminalHyperlink(label, url) {
+  return `${OSC8_OPEN}${url}${OSC8_TERM}${label}${OSC8_CLOSE}`;
+}
+
 function printUsageNotice(config = loadUsageNoticeConfig(), writeLine = console.error) {
   writeLine("");
   writeLine(`  ${config.title}`);
   writeLine("  ──────────────────────────────────────────────────");
   for (const line of config.body || []) {
-    writeLine(`  ${line}`);
+    const renderedLine =
+      /^https?:\/\//.test(line) && supportsTerminalHyperlinks()
+        ? formatTerminalHyperlink(line, line)
+        : line;
+    writeLine(`  ${renderedLine}`);
   }
   writeLine("");
 }
@@ -123,6 +142,8 @@ module.exports = {
   getUsageNoticeStateFile,
   hasAcceptedUsageNotice,
   loadUsageNoticeConfig,
+  formatTerminalHyperlink,
   printUsageNotice,
   saveUsageNoticeAcceptance,
+  supportsTerminalHyperlinks,
 };

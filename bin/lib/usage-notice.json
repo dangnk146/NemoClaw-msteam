@@ -1,13 +1,13 @@
 {
   "version": "2026-04-01b",
   "title": "Third-Party Software Notice",
-  "referenceUrl": "https://github.com/openclaw/openclaw/blob/c22233d96c37f843b48459bc58289b4355b862dc/src/wizard/setup.ts#L83",
+  "referenceUrl": "https://docs.openclaw.ai/gateway/security",
   "body": [
     "NemoClaw deploys OpenClaw into an OpenShell sandbox and may install or run OpenClaw and other third-party software on your behalf.",
-    "Before continuing, review the OpenClaw onboarding notice and the official OpenClaw security guidance:",
-    "https://github.com/openclaw/openclaw/blob/c22233d96c37f843b48459bc58289b4355b862dc/src/wizard/setup.ts#L83",
+    "By continuing, you acknowledge that your use of third-party software is subject to its own terms, licenses, and security guidance, and that you are responsible for reviewing and complying with them.",
+    "OpenClaw security guidance:",
     "https://docs.openclaw.ai/gateway/security",
-    "Third-party software, services, and materials are governed by their own terms, conditions, and licenses. By continuing, you acknowledge that you are responsible for reviewing and complying with them."
+    "If you do not accept this, stop now."
   ],
   "interactivePrompt": "Type 'yes' to accept this third-party software notice and continue [no]: "
 }

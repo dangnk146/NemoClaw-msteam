@@ -10,9 +10,11 @@ const noticePath = path.join(repoRoot, "bin", "lib", "usage-notice.js");
 const {
   NOTICE_ACCEPT_FLAG,
   ensureUsageNoticeConsent,
+  formatTerminalHyperlink,
   getUsageNoticeStateFile,
   hasAcceptedUsageNotice,
   loadUsageNoticeConfig,
+  printUsageNotice,
 } = require(noticePath);
 
 describe("usage notice", () => {
@@ -107,5 +109,37 @@ describe("usage notice", () => {
 
     expect(ok).toBe(false);
     expect(lines.join("\n")).toContain("Interactive onboarding requires a TTY");
+  });
+
+  it("renders url lines as terminal hyperlinks when tty output is available", () => {
+    const lines = [];
+    const originalStdoutIsTTY = process.stdout.isTTY;
+    const originalStderrIsTTY = process.stderr.isTTY;
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: true,
+    });
+
+    printUsageNotice(loadUsageNoticeConfig(), (line) => lines.push(line));
+
+    Object.defineProperty(process.stdout, "isTTY", {
+      configurable: true,
+      value: originalStdoutIsTTY,
+    });
+    Object.defineProperty(process.stderr, "isTTY", {
+      configurable: true,
+      value: originalStderrIsTTY,
+    });
+
+    expect(lines.join("\n")).toContain(
+      formatTerminalHyperlink(
+        "https://docs.openclaw.ai/gateway/security",
+        "https://docs.openclaw.ai/gateway/security",
+      ),
+    );
   });
 });
