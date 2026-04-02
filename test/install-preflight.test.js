@@ -584,16 +584,17 @@ fi`,
       "bash",
       [INSTALLER, "--non-interactive", "--yes-i-accept-third-party-software"],
       {
-      cwd: path.join(import.meta.dirname, ".."),
-      encoding: "utf-8",
-      env: {
-        ...process.env,
-        HOME: tmp,
-        PATH: `${fakeBin}:${TEST_SYSTEM_PATH}`,
-        NPM_PREFIX: prefix,
-        NEMOCLAW_ONBOARD_LOG: onboardLog,
+        cwd: path.join(import.meta.dirname, ".."),
+        encoding: "utf-8",
+        env: {
+          ...process.env,
+          HOME: tmp,
+          PATH: `${fakeBin}:${TEST_SYSTEM_PATH}`,
+          NPM_PREFIX: prefix,
+          NEMOCLAW_ONBOARD_LOG: onboardLog,
+        },
       },
-    });
+    );
 
     expect(result.status).toBe(0);
     expect(fs.readFileSync(onboardLog, "utf-8")).toMatch(

@@ -613,7 +613,9 @@ async function onboard(args) {
   const unknownArgs = args.filter((arg) => !allowedArgs.has(arg));
   if (unknownArgs.length > 0) {
     console.error(`  Unknown onboard option(s): ${unknownArgs.join(", ")}`);
-    console.error(`  Usage: nemoclaw onboard [--non-interactive] [--resume] [${NOTICE_ACCEPT_FLAG}]`);
+    console.error(
+      `  Usage: nemoclaw onboard [--non-interactive] [--resume] [${NOTICE_ACCEPT_FLAG}]`,
+    );
     process.exit(1);
   }
   const nonInteractive = args.includes("--non-interactive");

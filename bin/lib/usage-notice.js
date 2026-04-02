@@ -69,7 +69,9 @@ async function ensureUsageNoticeConsent({
       );
       return false;
     }
-    writeLine(`  [non-interactive] Third-party software notice accepted via ${NOTICE_ACCEPT_FLAG}.`);
+    writeLine(
+      `  [non-interactive] Third-party software notice accepted via ${NOTICE_ACCEPT_FLAG}.`,
+    );
     saveUsageNoticeAcceptance(config.version);
     return true;
   }
@@ -82,7 +84,9 @@ async function ensureUsageNoticeConsent({
   }
 
   const ask = promptFn || require("./credentials").prompt;
-  const answer = String(await ask(`  ${config.interactivePrompt}`)).trim().toLowerCase();
+  const answer = String(await ask(`  ${config.interactivePrompt}`))
+    .trim()
+    .toLowerCase();
   if (answer !== "yes") {
     writeLine("  Installation cancelled.");
     return false;

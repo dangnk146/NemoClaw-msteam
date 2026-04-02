@@ -17,9 +17,11 @@ const {
 
 describe("usage notice", () => {
   const originalIsTTY = process.stdin.isTTY;
+  let testHome = null;
 
   beforeEach(() => {
-    process.env.HOME = fs.mkdtempSync(path.join(import.meta.dirname, "usage-notice-home-"));
+    testHome = fs.mkdtempSync(path.join(import.meta.dirname, "usage-notice-home-"));
+    process.env.HOME = testHome;
     try {
       fs.rmSync(getUsageNoticeStateFile(), { force: true });
     } catch {
@@ -36,6 +38,10 @@ describe("usage notice", () => {
       configurable: true,
       value: originalIsTTY,
     });
+    if (testHome) {
+      fs.rmSync(testHome, { force: true, recursive: true });
+      testHome = null;
+    }
   });
 
   it("requires the non-interactive acceptance flag", async () => {
