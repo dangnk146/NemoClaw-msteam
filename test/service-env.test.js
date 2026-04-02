@@ -188,12 +188,16 @@ describe("service environment", () => {
           `export TELEGRAM_BOT_TOKEN="test-token"`,
           `export NVIDIA_API_KEY="test-key"`,
           `export ALLOWED_CHAT_IDS="111,222,333"`,
-          // Build a minimal PATH that includes node but hides openshell/cloudflared
+          // Stub openshell (prints "Ready" to pass sandbox check) and hide cloudflared
+          `BIN_DIR="${workspace}/bin"`,
+          `mkdir -p "$BIN_DIR"`,
+          `printf '#!/usr/bin/env bash\\necho "Ready"\\n' > "$BIN_DIR/openshell"`,
+          `chmod +x "$BIN_DIR/openshell"`,
           `NODE_DIR="$(dirname "$(command -v node)")"`,
-          `export PATH="/usr/bin:/bin:/usr/local/bin:$NODE_DIR"`,
-          // Run the real script but with REPO_DIR overridden via sed
+          `export PATH="$BIN_DIR:$NODE_DIR:/usr/bin:/bin:/usr/local/bin"`,
+          // Run the real script but with REPO_DIR overridden via sed — also disable cloudflared
           `PATCHED="${workspace}/patched-start.sh"`,
-          `sed 's|REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"|REPO_DIR="'"$FAKE_REPO"'"|' "${scriptPath}" > "$PATCHED"`,
+          `sed -e 's|REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"|REPO_DIR="'"$FAKE_REPO"'"|' -e 's|command -v cloudflared|false|g' "${scriptPath}" > "$PATCHED"`,
           `chmod +x "$PATCHED"`,
           `bash "$PATCHED"`,
           // Poll for the env dump file (nohup child writes it asynchronously)
@@ -263,10 +267,15 @@ describe("service environment", () => {
           `export TELEGRAM_BOT_TOKEN="test-token"`,
           `export NVIDIA_API_KEY="test-key"`,
           `export ALLOWED_CHAT_IDS="111, 222 , 333"`,
+          // Stub openshell (prints "Ready" to pass sandbox check) and hide cloudflared
+          `BIN_DIR="${workspace}/bin"`,
+          `mkdir -p "$BIN_DIR"`,
+          `printf '#!/usr/bin/env bash\\necho "Ready"\\n' > "$BIN_DIR/openshell"`,
+          `chmod +x "$BIN_DIR/openshell"`,
           `NODE_DIR="$(dirname "$(command -v node)")"`,
-          `export PATH="/usr/bin:/bin:/usr/local/bin:$NODE_DIR"`,
+          `export PATH="$BIN_DIR:$NODE_DIR:/usr/bin:/bin:/usr/local/bin"`,
           `PATCHED="${workspace}/patched-start.sh"`,
-          `sed 's|REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"|REPO_DIR="'"$FAKE_REPO"'"|' "${scriptPath}" > "$PATCHED"`,
+          `sed -e 's|REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"|REPO_DIR="'"$FAKE_REPO"'"|' -e 's|command -v cloudflared|false|g' "${scriptPath}" > "$PATCHED"`,
           `chmod +x "$PATCHED"`,
           `bash "$PATCHED"`,
           `for i in $(seq 1 20); do [ -s "${resultFile}" ] && break; sleep 0.1; done`,
