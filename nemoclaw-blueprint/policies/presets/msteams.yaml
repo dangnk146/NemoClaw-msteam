@@ -14,6 +14,7 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
+        tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
@@ -22,22 +23,7 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
-        rules:
-          - allow: { method: GET, path: "/**" }
-          - allow: { method: POST, path: "/**" }
-      # Bot Framework connector API
-      - host: api.botframework.com
-        port: 443
-        protocol: rest
-        enforcement: enforce
-        rules:
-          - allow: { method: GET, path: "/**" }
-          - allow: { method: POST, path: "/**" }
-      # Bot Framework state service
-      - host: state.botframework.com
-        port: 443
-        protocol: rest
-        enforcement: enforce
+        tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
@@ -46,26 +32,50 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
+        tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
-      # Teams Bot Framework delivery — access: full để tránh L7 abort connection
+      # Bot Framework connector API
+      - host: api.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework state service
+      - host: state.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Teams Bot Framework delivery — access: full + tls: passthrough
+      # Proxy KHÔNG được terminate TLS ở đây; nếu terminate thì Axios nhận
+      # stream abort khi Microsoft đóng keep-alive. CONNECT tunnel + passthrough
+      # giữ nguyên TCP connection end-to-end.
       - host: smba.trafficmanager.net
         port: 443
         access: full
-      # Teams service (Southeast Asia + other regions)
+        tls: passthrough
+      # Teams service
       - host: teams.microsoft.com
         port: 443
         protocol: rest
         enforcement: enforce
+        tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
-      # Azure Bot Service (reply URLs vary by region)
+      # Azure Bot Service reply URLs (regional, wildcard via access: full)
       - host: azurewebsites.net
         port: 443
         access: full
-      # Service Bus (used by some Bot Framework channels)
+      # Service Bus — Bot Framework channel transport (TCP/AMQP over 443)
       - host: servicebus.windows.net
         port: 443
         access: full
@@ -74,8 +84,10 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
+        tls: terminate
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
     binaries:
       - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/openclaw }
