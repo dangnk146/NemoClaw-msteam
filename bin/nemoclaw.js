@@ -627,7 +627,6 @@ async function setupMsteams() {
   await runSetupMsteams();
 }
 
-async function setup() {
 async function setup(args = []) {
   console.log("");
   console.log("  ⚠  `nemoclaw setup` is deprecated. Use `nemoclaw onboard` instead.");
@@ -1202,6 +1201,7 @@ const [cmd, ...args] = process.argv.slice(2);
 
   // Global commands
   if (GLOBAL_COMMANDS.has(cmd)) {
+
     switch (cmd) {
       case "onboard":
         await onboard(args);
