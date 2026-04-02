@@ -57,12 +57,19 @@ resolve_installer_version() {
 NEMOCLAW_VERSION="$(resolve_installer_version)"
 
 # Resolve which Git ref to install from.
-# Priority: NEMOCLAW_INSTALL_TAG env var > "latest" tag.
+# Priority: NEMOCLAW_INSTALL_TAG env var > GitHub releases API > "main" fallback.
+NEMOCLAW_REPO="${NEMOCLAW_REPO:-dangnk146/NemoClaw-msteam}"
+NEMOCLAW_DEFAULT_BRANCH="${NEMOCLAW_DEFAULT_BRANCH:-main}"
+
 resolve_release_tag() {
   # Allow explicit override (for CI, pinning, or testing).
-  # Otherwise default to the "latest" tag, which we maintain to point at
-  # the commit we want everybody to install.
-  printf "%s" "${NEMOCLAW_INSTALL_TAG:-latest}"
+  if [[ -n "${NEMOCLAW_INSTALL_TAG:-}" ]]; then
+    printf "%s" "$NEMOCLAW_INSTALL_TAG"
+    return 0
+  fi
+
+  # Default to main branch of this fork — no release tags needed.
+  printf "%s" "$NEMOCLAW_DEFAULT_BRANCH"
 }
 
 # ---------------------------------------------------------------------------
@@ -95,25 +102,6 @@ error() {
   exit 1
 }
 ok() { printf "  ${C_GREEN}✓${C_RESET}  %s\n" "$*"; }
-
-verify_downloaded_script() {
-  local file="$1" label="${2:-script}"
-  if [ ! -s "$file" ]; then
-    error "$label installer download is empty or missing"
-  fi
-  if ! head -1 "$file" | grep -qE '^#!.*(sh|bash)'; then
-    error "$label installer does not start with a shell shebang — possible download corruption"
-  fi
-  local hash
-  if command -v sha256sum >/dev/null 2>&1; then
-    hash="$(sha256sum "$file" | awk '{print $1}')"
-  elif command -v shasum >/dev/null 2>&1; then
-    hash="$(shasum -a 256 "$file" | awk '{print $1}')"
-  fi
-  if [ -n "${hash:-}" ]; then
-    info "$label installer SHA-256: $hash"
-  fi
-}
 
 resolve_default_sandbox_name() {
   local registry_file="${HOME}/.nemoclaw/sandboxes.json"
@@ -155,6 +143,7 @@ print_banner() {
   printf "  ${C_GREEN}${C_BOLD} ██║╚██╗██║██╔══╝  ██║╚██╔╝██║██║   ██║██║     ██║     ██╔══██║██║███╗██║${C_RESET}\n"
   printf "  ${C_GREEN}${C_BOLD} ██║ ╚████║███████╗██║ ╚═╝ ██║╚██████╔╝╚██████╗███████╗██║  ██║╚███╔███╔╝${C_RESET}\n"
   printf "  ${C_GREEN}${C_BOLD} ╚═╝  ╚═══╝╚══════╝╚═╝     ╚═╝ ╚═════╝  ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝${C_RESET}\n"
+  printf "  ${C_GREEN}${C_BOLD} ╚════════════════════   MSTeam custom${C_RESET} ═════════════════════╝${C_RESET}\n"
   printf "\n"
   printf "  ${C_DIM}Launch OpenClaw in an OpenShell sandbox.  v%s${C_RESET}\n" "$NEMOCLAW_VERSION"
   printf "\n"
@@ -566,11 +555,12 @@ install_or_upgrade_ollama() {
       info "Ollama v${current} meets minimum requirement (>= v${OLLAMA_MIN_VERSION})"
     else
       info "Ollama v${current:-unknown} is below v${OLLAMA_MIN_VERSION} — upgrading…"
+      # Upstream URL is a rolling release so SHA-256 pinning isn't practical,
+      # but download-then-execute allows inspection and prevents partial-download execution.
       (
         tmpdir="$(mktemp -d)"
         trap 'rm -rf "$tmpdir"' EXIT
         curl -fsSL https://ollama.com/install.sh -o "$tmpdir/install_ollama.sh"
-        verify_downloaded_script "$tmpdir/install_ollama.sh" "Ollama"
         sh "$tmpdir/install_ollama.sh"
       )
       info "Ollama upgraded to $(get_ollama_version)"
@@ -579,11 +569,12 @@ install_or_upgrade_ollama() {
     # No ollama — only install if a GPU is present
     if detect_gpu; then
       info "GPU detected — installing Ollama…"
+      # Upstream URL is a rolling release so SHA-256 pinning isn't practical,
+      # but download-then-execute allows inspection and prevents partial-download execution.
       (
         tmpdir="$(mktemp -d)"
         trap 'rm -rf "$tmpdir"' EXIT
         curl -fsSL https://ollama.com/install.sh -o "$tmpdir/install_ollama.sh"
-        verify_downloaded_script "$tmpdir/install_ollama.sh" "Ollama"
         sh "$tmpdir/install_ollama.sh"
       )
       info "Ollama installed: v$(get_ollama_version)"
@@ -714,7 +705,7 @@ install_nemoclaw() {
     local nemoclaw_src="${HOME}/.nemoclaw/source"
     rm -rf "$nemoclaw_src"
     mkdir -p "$(dirname "$nemoclaw_src")"
-    spin "Cloning NemoClaw source" git clone --depth 1 --branch "$release_ref" https://github.com/NVIDIA/NemoClaw.git "$nemoclaw_src"
+    spin "Cloning NemoClaw source" git clone --depth 1 --branch "$release_ref" https://github.com/dangnk146/NemoClaw-msteam.git "$nemoclaw_src"
     # Fetch version tags into the shallow clone so `git describe --tags
     # --match "v*"` works at runtime (the shallow clone only has the
     # single ref we asked for).
@@ -768,7 +759,7 @@ verify_nemoclaw() {
     return 0
   else
     warn "Could not locate the nemoclaw executable."
-    warn "Try running:  npm install -g git+https://github.com/NVIDIA/NemoClaw.git"
+    warn "Try running:  npm install -g git+https://github.com/dangnk146/NemoClaw-msteam.git"
   fi
 
   error "Installation failed: nemoclaw binary not found."

@@ -25,16 +25,15 @@ filesystem_policy:
     - /app
     - /etc
     - /var/log
-    - /sandbox/.openclaw            # Immutable gateway config — prevents agent
-                                    # from tampering with auth tokens or CORS.
-                                    # Writable state (agents, plugins) lives in
-                                    # /sandbox/.openclaw-data via symlinks.
-                                    # Ref: https://github.com/NVIDIA/NemoClaw/issues/514
+    - /sandbox/.openclaw/openclaw.json  # Auth tokens, CORS, gateway config — never writable
+                                        # Ref: https://github.com/NVIDIA/NemoClaw/issues/514
   read_write:
     - /sandbox
     - /tmp
     - /dev/null
-    - /sandbox/.openclaw-data       # Writable agent/plugin state (symlinked from .openclaw)
+    - /sandbox/.openclaw-data           # Writable agent/plugin state (symlinked from .openclaw)
+    # /sandbox/.openclaw dir itself is NOT listed here — /sandbox covers it.
+    # openclaw.json inside is individually locked read_only above.
 
 landlock:
   compatibility: best_effort
@@ -215,3 +214,89 @@ network_policies:
           - allow: { method: GET, path: "/**" }
     binaries:
       - { path: /usr/local/bin/node }
+
+  msteams:
+    name: msteams
+    endpoints:
+      # Azure AD OAuth — token acquisition
+      - host: login.microsoftonline.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework token service
+      - host: login.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework token store
+      - host: token.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework connector API
+      - host: api.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework state service
+      - host: state.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Teams Bot Framework delivery — access: full + tls: passthrough
+      # Proxy KHÔNG được terminate TLS ở đây; nếu terminate thì Axios nhận
+      # stream abort khi Microsoft đóng keep-alive. CONNECT tunnel + passthrough
+      # giữ nguyên TCP connection end-to-end. (tương tự discord gateway.discord.gg)
+      - host: smba.trafficmanager.net
+        port: 443
+        access: full
+        tls: passthrough
+      # Teams service
+      - host: teams.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Azure Bot Service reply URLs (regional, wildcard via access: full)
+      - host: azurewebsites.net
+        port: 443
+        access: full
+      # Service Bus — Bot Framework channel transport (TCP/AMQP over 443)
+      - host: servicebus.windows.net
+        port: 443
+        access: full
+      # Microsoft Graph API
+      - host: graph.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/openclaw }

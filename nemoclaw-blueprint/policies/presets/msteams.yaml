@@ -1,0 +1,93 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+preset:
+  name: msteams
+  description: "Microsoft Teams Bot Framework API and service endpoints"
+
+network_policies:
+  msteams:
+    name: msteams
+    endpoints:
+      # Azure AD OAuth — token acquisition
+      - host: login.microsoftonline.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework token service
+      - host: login.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework token store
+      - host: token.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework connector API
+      - host: api.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework state service
+      - host: state.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Teams Bot Framework delivery — access: full + tls: passthrough
+      # Proxy KHÔNG được terminate TLS ở đây; nếu terminate thì Axios nhận
+      # stream abort khi Microsoft đóng keep-alive. CONNECT tunnel + passthrough
+      # giữ nguyên TCP connection end-to-end.
+      - host: smba.trafficmanager.net
+        port: 443
+        access: full
+        tls: passthrough
+      # Teams service
+      - host: teams.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Azure Bot Service reply URLs (regional, wildcard via access: full)
+      - host: azurewebsites.net
+        port: 443
+        access: full
+      # Service Bus — Bot Framework channel transport (TCP/AMQP over 443)
+      - host: servicebus.windows.net
+        port: 443
+        access: full
+      # Microsoft Graph API
+      - host: graph.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        tls: terminate
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/local/bin/openclaw }

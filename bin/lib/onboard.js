@@ -225,6 +225,7 @@ function repairRecordedSandbox(sandboxName) {
   if (!sandboxName) return;
   note(`  [resume] Cleaning up recorded sandbox '${sandboxName}' before recreating it.`);
   runOpenshell(["forward", "stop", "18789"], { ignoreError: true });
+  runOpenshell(["forward", "stop", process.env.MSTEAMS_WEBHOOK_PORT || "3978"], { ignoreError: true });
   runOpenshell(["sandbox", "delete", sandboxName], { ignoreError: true });
   registry.removeSandbox(sandboxName);
 }
@@ -921,6 +922,23 @@ function patchStagedDockerfile(
     /^ARG NEMOCLAW_DISABLE_DEVICE_AUTH=.*$/m,
     `ARG NEMOCLAW_DISABLE_DEVICE_AUTH=1`,
   );
+
+  // Inject MS Teams credentials if configured
+  const msteamsAppId = process.env.MSTEAMS_APP_ID || "";
+  if (msteamsAppId) {
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_APP_ID=.*$/m, `ARG MSTEAMS_APP_ID=${msteamsAppId}`);
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_APP_PASSWORD=.*$/m, `ARG MSTEAMS_APP_PASSWORD=${process.env.MSTEAMS_APP_PASSWORD || ""}`);
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_TENANT_ID=.*$/m, `ARG MSTEAMS_TENANT_ID=${process.env.MSTEAMS_TENANT_ID || ""}`);
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_DM_POLICY=.*$/m, `ARG MSTEAMS_DM_POLICY=${process.env.MSTEAMS_DM_POLICY || "pairing"}`);
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_GROUP_POLICY=.*$/m, `ARG MSTEAMS_GROUP_POLICY=${process.env.MSTEAMS_GROUP_POLICY || "allowlist"}`);
+    const allowFrom = (process.env.MSTEAMS_ALLOW_FROM || "").replace(/\s/g, "");
+    if (allowFrom) {
+      dockerfile = dockerfile.replace(/^ARG MSTEAMS_ALLOW_FROM=.*$/m, `ARG MSTEAMS_ALLOW_FROM=${allowFrom}`);
+    }
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_WEBHOOK_PORT=.*$/m, `ARG MSTEAMS_WEBHOOK_PORT=${process.env.MSTEAMS_WEBHOOK_PORT || "3978"}`);
+    dockerfile = dockerfile.replace(/^ARG MSTEAMS_WEBHOOK_PATH=.*$/m, `ARG MSTEAMS_WEBHOOK_PATH=${process.env.MSTEAMS_WEBHOOK_PATH || "/api/messages"}`);
+  }
+
   fs.writeFileSync(dockerfilePath, dockerfile);
 }
 
@@ -1780,6 +1798,7 @@ async function preflight() {
   if (gatewayReuseState === "stale" || gatewayReuseState === "active-unnamed") {
     console.log("  Cleaning up previous NemoClaw session...");
     runOpenshell(["forward", "stop", "18789"], { ignoreError: true });
+    runOpenshell(["forward", "stop", process.env.MSTEAMS_WEBHOOK_PORT || "3978"], { ignoreError: true });
     runOpenshell(["gateway", "destroy", "-g", GATEWAY_NAME], { ignoreError: true });
     console.log("  ✓ Previous session cleaned up");
   }
@@ -1788,6 +1807,9 @@ async function preflight() {
   const requiredPorts = [
     { port: 8080, label: "OpenShell gateway" },
     { port: 18789, label: "NemoClaw dashboard" },
+    ...(process.env.MSTEAMS_APP_ID
+      ? [{ port: parseInt(process.env.MSTEAMS_WEBHOOK_PORT || "3978", 10), label: "MS Teams webhook" }]
+      : []),
   ];
   for (const { port, label } of requiredPorts) {
     const portCheck = await checkPortAvailable(port);
@@ -2142,6 +2164,11 @@ async function createSandbox(
   // --gpu is intentionally omitted. See comment in startGateway().
 
   console.log(`  Creating sandbox '${sandboxName}' (this takes a few minutes on first run)...`);
+  // Load MS Teams credentials from openclaw.json into env if not already set
+  if (!process.env.MSTEAMS_APP_ID) {
+    const { loadMsteamsEnv } = require("./msteams-setup");
+    loadMsteamsEnv();
+  }
   patchStagedDockerfile(
     stagedDockerfile,
     model,
@@ -2258,11 +2285,29 @@ async function createSandbox(
   // which would silently prevent the new sandbox's dashboard from being reachable.
   ensureDashboardForward(sandboxName, chatUiUrl);
 
+  // Forward MS Teams webhook port if msteams is configured
+  if (process.env.MSTEAMS_APP_ID) {
+    const msteamsPort = process.env.MSTEAMS_WEBHOOK_PORT || "3978";
+    runOpenshell(["forward", "stop", msteamsPort], { ignoreError: true });
+    runOpenshell(["forward", "start", "--background", msteamsPort, sandboxName], { ignoreError: true });
+    console.log(`  ✓ MS Teams webhook forwarded on port ${msteamsPort}`);
+  }
+
   // Register only after confirmed ready — prevents phantom entries
   registry.registerSandbox({
     name: sandboxName,
     gpuEnabled: !!gpu,
   });
+
+  // Auto-apply msteams network policy preset if msteams is configured
+  if (process.env.MSTEAMS_APP_ID) {
+    console.log("  Applying MS Teams network policy preset...");
+    try {
+      policies.applyPreset(sandboxName, "msteams");
+    } catch (err) {
+      console.warn(`  Warning: could not apply msteams policy preset: ${err.message}`);
+    }
+  }
 
   // DNS proxy — run a forwarder in the sandbox pod so the isolated
   // sandbox namespace can resolve hostnames (fixes #626).
