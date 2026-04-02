@@ -37,6 +37,9 @@ COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
 WORKDIR /opt/nemoclaw
 RUN npm ci --omit=dev
 
+# Install missing peer dependency for openclaw msteams extension
+RUN npm install --prefix /usr/local/lib/node_modules/openclaw @microsoft/agents-hosting --legacy-peer-deps
+
 # Set up blueprint for local resolution
 RUN mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
     && cp -r /opt/nemoclaw-blueprint/* /sandbox/.nemoclaw/blueprints/0.1.0/
@@ -61,6 +64,16 @@ ARG NEMOCLAW_DISABLE_DEVICE_AUTH=0
 # Pass --build-arg NEMOCLAW_BUILD_ID=$(date +%s) to bust the cache.
 ARG NEMOCLAW_BUILD_ID=default
 
+# MS Teams Bot Framework credentials (optional — leave blank to disable)
+ARG MSTEAMS_APP_ID=
+ARG MSTEAMS_APP_PASSWORD=
+ARG MSTEAMS_TENANT_ID=
+ARG MSTEAMS_DM_POLICY=pairing
+ARG MSTEAMS_GROUP_POLICY=open
+ARG MSTEAMS_ALLOW_FROM=
+ARG MSTEAMS_WEBHOOK_PORT=3978
+ARG MSTEAMS_WEBHOOK_PATH=/api/messages
+
 # SECURITY: Promote build-args to env vars so the Python script reads them
 # via os.environ, never via string interpolation into Python source code.
 # Direct ARG interpolation into python3 -c is a code injection vector (C-2).
@@ -71,7 +84,15 @@ ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
     NEMOCLAW_INFERENCE_BASE_URL=${NEMOCLAW_INFERENCE_BASE_URL} \
     NEMOCLAW_INFERENCE_API=${NEMOCLAW_INFERENCE_API} \
     NEMOCLAW_INFERENCE_COMPAT_B64=${NEMOCLAW_INFERENCE_COMPAT_B64} \
-    NEMOCLAW_DISABLE_DEVICE_AUTH=${NEMOCLAW_DISABLE_DEVICE_AUTH}
+    NEMOCLAW_DISABLE_DEVICE_AUTH=${NEMOCLAW_DISABLE_DEVICE_AUTH} \
+    MSTEAMS_APP_ID=${MSTEAMS_APP_ID} \
+    MSTEAMS_APP_PASSWORD=${MSTEAMS_APP_PASSWORD} \
+    MSTEAMS_TENANT_ID=${MSTEAMS_TENANT_ID} \
+    MSTEAMS_DM_POLICY=${MSTEAMS_DM_POLICY} \
+    MSTEAMS_GROUP_POLICY=${MSTEAMS_GROUP_POLICY} \
+    MSTEAMS_ALLOW_FROM=${MSTEAMS_ALLOW_FROM} \
+    MSTEAMS_WEBHOOK_PORT=${MSTEAMS_WEBHOOK_PORT} \
+    MSTEAMS_WEBHOOK_PATH=${MSTEAMS_WEBHOOK_PATH}
 
 WORKDIR /sandbox
 USER sandbox
@@ -105,10 +126,27 @@ providers = { \
         'models': [{**({'compat': inference_compat} if inference_compat else {}), 'id': model, 'name': primary_model_ref, 'reasoning': False, 'input': ['text'], 'cost': {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheWrite': 0}, 'contextWindow': 131072, 'maxTokens': 4096}] \
     } \
 }; \
+msteams_app_id = os.environ.get('MSTEAMS_APP_ID', '').strip(); \
+msteams_channels = {}; \
+(msteams_channels.update({'msteams': { \
+    'enabled': True, \
+    'appId': msteams_app_id, \
+    'appPassword': os.environ.get('MSTEAMS_APP_PASSWORD', '').strip(), \
+    'tenantId': os.environ.get('MSTEAMS_TENANT_ID', '').strip(), \
+    'webhook': { \
+        'port': int(os.environ.get('MSTEAMS_WEBHOOK_PORT', '3978') or '3978'), \
+        'path': os.environ.get('MSTEAMS_WEBHOOK_PATH', '/api/messages').strip() or '/api/messages', \
+    }, \
+    'dmPolicy': os.environ.get('MSTEAMS_DM_POLICY', 'pairing').strip(), \
+    'groupPolicy': os.environ.get('MSTEAMS_GROUP_POLICY', 'open').strip(), \
+    'allowFrom': [x for x in os.environ.get('MSTEAMS_ALLOW_FROM', '').split(',') if x.strip()], \
+}}) if msteams_app_id else None); \
+plugins_cfg = ({'entries': {'msteams': {'enabled': True}}} if msteams_app_id else {}); \
 config = { \
     'agents': {'defaults': {'model': {'primary': primary_model_ref}}}, \
     'models': {'mode': 'merge', 'providers': providers}, \
-    'channels': {'defaults': {'configWrites': False}}, \
+    'channels': msteams_channels if msteams_channels else {}, \
+    'plugins': plugins_cfg, \
     'gateway': { \
         'mode': 'local', \
         'controlUi': { \
@@ -140,6 +178,13 @@ RUN openclaw doctor --fix > /dev/null 2>&1 || true \
 # The writable state lives in .openclaw-data, reached via the symlinks.
 # hadolint ignore=DL3002
 USER root
+# Ensure credentials dir + symlink exist (idempotent — base image may predate this)
+RUN mkdir -p /sandbox/.openclaw-data/credentials \
+    && chown sandbox:sandbox /sandbox/.openclaw-data/credentials \
+    && ([ -e /sandbox/.openclaw/credentials ] || ln -s /sandbox/.openclaw-data/credentials /sandbox/.openclaw/credentials) \
+    && touch /sandbox/.openclaw-data/exec-approvals.json \
+    && chown sandbox:sandbox /sandbox/.openclaw-data/exec-approvals.json \
+    && ([ -e /sandbox/.openclaw/exec-approvals.json ] || ln -s /sandbox/.openclaw-data/exec-approvals.json /sandbox/.openclaw/exec-approvals.json)
 RUN chown root:root /sandbox/.openclaw \
     && find /sandbox/.openclaw -mindepth 1 -maxdepth 1 -exec chown -h root:root {} + \
     && chmod 755 /sandbox/.openclaw \

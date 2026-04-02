@@ -49,21 +49,9 @@ const { parseLiveSandboxNames } = require("./lib/runtime-recovery");
 // ── Global commands ──────────────────────────────────────────────
 
 const GLOBAL_COMMANDS = new Set([
-  "onboard",
-  "list",
-  "deploy",
-  "setup",
-  "setup-spark",
-  "start",
-  "stop",
-  "status",
-  "debug",
-  "uninstall",
-  "help",
-  "--help",
-  "-h",
-  "--version",
-  "-v",
+  "onboard", "list", "deploy", "setup", "setup-spark", "setup-msteams",
+  "start", "stop", "status", "debug", "uninstall",
+  "help", "--help", "-h", "--version", "-v",
 ]);
 
 const REMOTE_UNINSTALL_URL =
@@ -634,6 +622,12 @@ async function onboard(args) {
   await runOnboard({ nonInteractive, resume });
 }
 
+async function setupMsteams() {
+  const { setupMsteams: runSetupMsteams } = require("./lib/msteams-setup");
+  await runSetupMsteams();
+}
+
+async function setup() {
 async function setup(args = []) {
   console.log("");
   console.log("  ⚠  `nemoclaw setup` is deprecated. Use `nemoclaw onboard` instead.");
@@ -1155,6 +1149,7 @@ function help() {
   ${G}Getting Started:${R}
     ${B}nemoclaw onboard${R}                 Configure inference endpoint and credentials
     nemoclaw setup-spark             Set up on DGX Spark ${D}(fixes cgroup v2 + Docker)${R}
+    nemoclaw setup-msteams           Configure MS Teams bot channel
 
   ${G}Sandbox Management:${R}
     ${B}nemoclaw list${R}                    List all sandboxes
@@ -1219,6 +1214,9 @@ const [cmd, ...args] = process.argv.slice(2);
         break;
       case "deploy":
         await deploy(args[0]);
+        break;
+      case "setup-msteams":
+        await setupMsteams();
         break;
       case "start":
         await start();

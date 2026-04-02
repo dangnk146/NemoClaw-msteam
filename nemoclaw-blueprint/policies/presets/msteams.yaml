@@ -1,0 +1,81 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+preset:
+  name: msteams
+  description: "Microsoft Teams Bot Framework API and service endpoints"
+
+network_policies:
+  msteams:
+    name: msteams
+    endpoints:
+      # Azure AD OAuth — token acquisition
+      - host: login.microsoftonline.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework token service
+      - host: login.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework connector API
+      - host: api.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework state service
+      - host: state.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Bot Framework token store
+      - host: token.botframework.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Teams Bot Framework delivery — access: full để tránh L7 abort connection
+      - host: smba.trafficmanager.net
+        port: 443
+        access: full
+      # Teams service (Southeast Asia + other regions)
+      - host: teams.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+      # Azure Bot Service (reply URLs vary by region)
+      - host: azurewebsites.net
+        port: 443
+        access: full
+      # Service Bus (used by some Bot Framework channels)
+      - host: servicebus.windows.net
+        port: 443
+        access: full
+      # Microsoft Graph API
+      - host: graph.microsoft.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow: { method: GET, path: "/**" }
+          - allow: { method: POST, path: "/**" }
+    binaries:
+      - { path: /usr/local/bin/node }
