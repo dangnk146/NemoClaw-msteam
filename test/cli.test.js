@@ -18,7 +18,13 @@ function runWithEnv(args, env = {}, timeout = 10000) {
     const out = execSync(`node "${CLI}" ${args}`, {
       encoding: "utf-8",
       timeout,
-      env: { ...process.env, HOME: "/tmp/nemoclaw-cli-test-" + Date.now(), ...env },
+      env: {
+        ...process.env,
+        HOME: "/tmp/nemoclaw-cli-test-" + Date.now(),
+        NEMOCLAW_HEALTH_POLL_COUNT: "1",
+        NEMOCLAW_HEALTH_POLL_INTERVAL: "0",
+        ...env,
+      },
     });
     return { code: 0, out };
   } catch (err) {
@@ -118,6 +124,20 @@ describe("CLI dispatch", () => {
     const r = run("onboard --resume --non-interactiv");
     expect(r.code).toBe(1);
     expect(r.out.includes("Unknown onboard option(s): --non-interactiv")).toBeTruthy();
+  });
+
+  it("setup forwards unknown options into onboard parsing", () => {
+    const r = run("setup --non-interactiv");
+    expect(r.code).toBe(1);
+    expect(r.out.includes("deprecated")).toBeTruthy();
+    expect(r.out.includes("Unknown onboard option(s): --non-interactiv")).toBeTruthy();
+  });
+
+  it("setup forwards --resume into onboard parsing", () => {
+    const r = run("setup --resume");
+    expect(r.code).toBe(1);
+    expect(r.out.includes("deprecated")).toBeTruthy();
+    expect(r.out.includes("No resumable onboarding session was found")).toBeTruthy();
   });
 
   it("debug --help exits 0 and shows usage", () => {
@@ -390,6 +410,136 @@ describe("CLI dispatch", () => {
     if (fs.existsSync(bashLog)) {
       expect(fs.readFileSync(bashLog, "utf8")).not.toContain("docker volume ls -q --filter");
     }
+  });
+
+  it("fails destroy when openshell sandbox delete returns a real error", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-destroy-failure-"));
+    const localBin = path.join(home, "bin");
+    const registryDir = path.join(home, ".nemoclaw");
+    const openshellLog = path.join(home, "openshell.log");
+    fs.mkdirSync(localBin, { recursive: true });
+    fs.mkdirSync(registryDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(registryDir, "sandboxes.json"),
+      JSON.stringify({
+        sandboxes: {
+          alpha: {
+            name: "alpha",
+            model: "test-model",
+            provider: "nvidia-prod",
+            gpuEnabled: false,
+            policies: [],
+          },
+        },
+        defaultSandbox: "alpha",
+      }),
+      { mode: 0o600 },
+    );
+    fs.writeFileSync(
+      path.join(localBin, "openshell"),
+      [
+        "#!/bin/sh",
+        `log_file=${JSON.stringify(openshellLog)}`,
+        'printf \'%s\\n\' "$*" >> "$log_file"',
+        'if [ "$1" = "sandbox" ] && [ "$2" = "delete" ]; then',
+        '  echo "transport error: gateway unavailable" >&2',
+        "  exit 1",
+        "fi",
+        "exit 0",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+
+    const r = runWithEnv("alpha destroy --yes", {
+      HOME: home,
+      PATH: `${localBin}:${process.env.PATH || ""}`,
+    });
+
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("transport error: gateway unavailable");
+    expect(r.out).toContain("Failed to destroy sandbox 'alpha'.");
+    expect(r.out).not.toContain("Sandbox 'alpha' destroyed");
+
+    const registryAfter = JSON.parse(
+      fs.readFileSync(path.join(registryDir, "sandboxes.json"), "utf8"),
+    );
+    expect(registryAfter.sandboxes.alpha).toBeTruthy();
+    expect(fs.readFileSync(openshellLog, "utf8")).toContain("sandbox delete alpha");
+    expect(fs.readFileSync(openshellLog, "utf8")).not.toContain("gateway destroy -g nemoclaw");
+  });
+
+  it("treats an already-missing sandbox as destroyed and clears the stale registry entry", () => {
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-destroy-missing-"));
+    const localBin = path.join(home, "bin");
+    const registryDir = path.join(home, ".nemoclaw");
+    const openshellLog = path.join(home, "openshell.log");
+    const bashLog = path.join(home, "bash.log");
+    fs.mkdirSync(localBin, { recursive: true });
+    fs.mkdirSync(registryDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(registryDir, "sandboxes.json"),
+      JSON.stringify({
+        sandboxes: {
+          alpha: {
+            name: "alpha",
+            model: "test-model",
+            provider: "nvidia-prod",
+            gpuEnabled: false,
+            policies: [],
+          },
+        },
+        defaultSandbox: "alpha",
+      }),
+      { mode: 0o600 },
+    );
+    fs.writeFileSync(
+      path.join(localBin, "openshell"),
+      [
+        "#!/bin/sh",
+        `log_file=${JSON.stringify(openshellLog)}`,
+        'if [ "$1" = "sandbox" ] && [ "$2" = "delete" ]; then',
+        '  printf \'%s\\n\' "$*" >> "$log_file"',
+        '  echo "Error: status: Not Found, message: \\"sandbox not found\\"" >&2',
+        "  exit 1",
+        "fi",
+        'if [ "$1" = "sandbox" ] && [ "$2" = "list" ]; then',
+        '  printf "NAME STATUS\\n" >> "$log_file"',
+        '  printf "NAME STATUS\\n"',
+        "  exit 0",
+        "fi",
+        'printf \'%s\\n\' "$*" >> "$log_file"',
+        "exit 0",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    fs.writeFileSync(
+      path.join(localBin, "bash"),
+      [
+        "#!/bin/sh",
+        `log_file=${JSON.stringify(bashLog)}`,
+        'printf \'%s\\n\' "$*" >> "$log_file"',
+        "exit 0",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+
+    const r = runWithEnv("alpha destroy --yes", {
+      HOME: home,
+      PATH: `${localBin}:${process.env.PATH || ""}`,
+    });
+
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("already absent from the live gateway");
+    expect(r.out).toContain("Sandbox 'alpha' destroyed");
+
+    const registryAfter = JSON.parse(
+      fs.readFileSync(path.join(registryDir, "sandboxes.json"), "utf8"),
+    );
+    expect(registryAfter.sandboxes.alpha).toBeFalsy();
+    expect(fs.readFileSync(openshellLog, "utf8")).toContain("sandbox delete alpha");
+    expect(fs.readFileSync(openshellLog, "utf8")).toContain("forward stop 18789");
+    expect(fs.readFileSync(openshellLog, "utf8")).toContain("gateway destroy -g nemoclaw");
+    expect(fs.readFileSync(bashLog, "utf8")).toContain("docker volume ls -q --filter");
   });
 
   it("passes plain logs through without the tail flag", () => {
@@ -1226,7 +1376,7 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
 
     expect(r.code).toBe(0);
@@ -1234,7 +1384,7 @@ describe("CLI dispatch", () => {
     expect(r.out.includes("gateway identity drift after restart")).toBeTruthy();
     const saved = JSON.parse(fs.readFileSync(path.join(registryDir, "sandboxes.json"), "utf8"));
     expect(saved.sandboxes.alpha).toBeTruthy();
-  }, 25000);
+  }, 10000);
 
   it("recovers status after gateway runtime is reattached", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-recover-status-"));
@@ -1366,14 +1516,14 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
 
     expect(r.code).toBe(0);
     expect(r.out.includes("Recovered NemoClaw gateway runtime")).toBeFalsy();
     expect(r.out.includes("Could not verify sandbox 'alpha'")).toBeTruthy();
     expect(r.out.includes("verify the active gateway")).toBeTruthy();
-  }, 25000);
+  }, 10000);
 
   it("matches ANSI-decorated gateway transport errors when printing lifecycle hints", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-ansi-transport-hint-"));
@@ -1430,12 +1580,12 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
 
     expect(r.code).toBe(0);
     expect(r.out.includes("current gateway/runtime is not reachable")).toBeTruthy();
-  }, 25000);
+  }, 10000);
 
   it("matches ANSI-decorated gateway auth errors when printing lifecycle hints", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-ansi-auth-hint-"));
@@ -1492,14 +1642,14 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
 
     expect(r.code).toBe(0);
     expect(
       r.out.includes("Verify the active gateway and retry after re-establishing the runtime."),
     ).toBeTruthy();
-  }, 25000);
+  }, 10000);
 
   it("explains unrecoverable gateway trust rotation after restart", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-identity-drift-"));
@@ -1555,7 +1705,7 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
     expect(statusResult.code).toBe(0);
     expect(statusResult.out.includes("gateway trust material rotated after restart")).toBeTruthy();
@@ -1632,7 +1782,7 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
     expect(statusResult.code).toBe(0);
     expect(
@@ -1651,7 +1801,7 @@ describe("CLI dispatch", () => {
       connectResult.out.includes("gateway is still refusing connections after restart"),
     ).toBeTruthy();
     expect(connectResult.out.includes("If the gateway never becomes healthy")).toBeTruthy();
-  }, 25000);
+  }, 10000);
 
   it("explains when the named gateway is no longer configured after restart or rebuild", () => {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), "nemoclaw-cli-gateway-missing-"));
@@ -1709,14 +1859,14 @@ describe("CLI dispatch", () => {
         HOME: home,
         PATH: `${localBin}:${process.env.PATH || ""}`,
       },
-      25000,
+      10000,
     );
     expect(statusResult.code).toBe(0);
     expect(
       statusResult.out.includes("gateway is no longer configured after restart/rebuild"),
     ).toBeTruthy();
     expect(statusResult.out.includes("Start the gateway again")).toBeTruthy();
-  }, 25000);
+  }, 10000);
 });
 
 describe("list shows live gateway inference", () => {
