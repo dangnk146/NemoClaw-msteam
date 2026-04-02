@@ -299,6 +299,8 @@ export NO_PROXY=\"$_NO_PROXY_VAL\"
 export http_proxy=\"$_PROXY_URL\"
 export https_proxy=\"$_PROXY_URL\"
 export no_proxy=\"$_NO_PROXY_VAL\"
+export NPM_CONFIG_PREFIX=/sandbox/.npm-global
+export PATH=\"/sandbox/.npm-global/bin:\$PATH\"
 ${_PROXY_MARKER_END}"
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -332,6 +334,16 @@ fi
 
 echo 'Setting up NemoClaw...' >&2
 [ -f .env ] && chmod 600 .env
+
+# Allow sandbox user to run `openclaw update` without EACCES.
+# npm global prefix defaults to /usr/local which is root-owned inside the sandbox.
+# Redirect to a writable path so `npm install -g openclaw` works without sudo.
+mkdir -p /sandbox/.npm-global/bin /sandbox/.npm-global/lib 2>/dev/null || true
+if [ "$(id -u)" -ne 0 ]; then
+  npm config set prefix /sandbox/.npm-global 2>/dev/null || true
+  export PATH="/sandbox/.npm-global/bin:$PATH"
+  export NPM_CONFIG_PREFIX=/sandbox/.npm-global
+fi
 
 # ── Non-root fallback ──────────────────────────────────────────
 # OpenShell runs containers with --security-opt=no-new-privileges, which

@@ -37,6 +37,11 @@ COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
 WORKDIR /opt/nemoclaw
 RUN npm ci --omit=dev
 
+# Allow sandbox user to update openclaw globally (npm install -g)
+RUN chown -R sandbox:sandbox /usr/local/lib/node_modules/openclaw \
+    && chown -R sandbox:sandbox /usr/local/bin/openclaw \
+    || true
+
 # Install missing peer dependency for openclaw msteams extension
 RUN npm install --prefix /usr/local/lib/node_modules/openclaw @microsoft/agents-hosting --legacy-peer-deps
 
