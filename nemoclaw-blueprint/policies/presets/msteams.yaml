@@ -54,14 +54,13 @@ network_policies:
         rules:
           - allow: { method: GET, path: "/**" }
           - allow: { method: POST, path: "/**" }
-      # Teams Bot Framework delivery — access: full + tls: passthrough
-      # Proxy KHÔNG được terminate TLS ở đây; nếu terminate thì Axios nhận
-      # stream abort khi Microsoft đóng keep-alive. CONNECT tunnel + passthrough
-      # giữ nguyên TCP connection end-to-end.
+      # Teams Bot Framework delivery — must use access: full (CONNECT tunnel)
+      # instead of protocol: rest. The proxy's HTTP idle timeout (~2 min) kills
+      # long-lived TCP connections; a CONNECT tunnel avoids HTTP-level timeouts
+      # entirely. Same pattern as discord gateway.discord.gg. See #409/#438.
       - host: smba.trafficmanager.net
         port: 443
         access: full
-        tls: passthrough
       # Teams service
       - host: teams.microsoft.com
         port: 443

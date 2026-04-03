@@ -37,13 +37,13 @@ COPY nemoclaw-blueprint/ /opt/nemoclaw-blueprint/
 WORKDIR /opt/nemoclaw
 RUN npm ci --omit=dev
 
-# Allow sandbox user to update openclaw globally (npm install -g)
-RUN chown -R sandbox:sandbox /usr/local/lib/node_modules/openclaw \
-    && chown -R sandbox:sandbox /usr/local/bin/openclaw \
-    || true
-
 # Install missing peer dependency for openclaw msteams extension
 RUN npm install --prefix /usr/local/lib/node_modules/openclaw @microsoft/agents-hosting --legacy-peer-deps
+
+# Allow sandbox user to run `openclaw update` without EACCES.
+# Must run AFTER all npm operations on openclaw to avoid ownership being reset.
+RUN chown -R sandbox:sandbox /usr/local/lib/node_modules/openclaw \
+    && chown sandbox:sandbox /usr/local/bin/openclaw 2>/dev/null || true
 
 # Set up blueprint for local resolution
 RUN mkdir -p /sandbox/.nemoclaw/blueprints/0.1.0 \
@@ -97,7 +97,8 @@ ENV NEMOCLAW_MODEL=${NEMOCLAW_MODEL} \
     MSTEAMS_GROUP_POLICY=${MSTEAMS_GROUP_POLICY} \
     MSTEAMS_ALLOW_FROM=${MSTEAMS_ALLOW_FROM} \
     MSTEAMS_WEBHOOK_PORT=${MSTEAMS_WEBHOOK_PORT} \
-    MSTEAMS_WEBHOOK_PATH=${MSTEAMS_WEBHOOK_PATH}
+    MSTEAMS_WEBHOOK_PATH=${MSTEAMS_WEBHOOK_PATH} \
+    NPM_CONFIG_PREFIX=/sandbox/.npm-global
 
 WORKDIR /sandbox
 USER sandbox
