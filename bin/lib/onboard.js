@@ -2285,12 +2285,30 @@ async function createSandbox(
   // which would silently prevent the new sandbox's dashboard from being reachable.
   ensureDashboardForward(sandboxName, chatUiUrl);
 
-  // Forward MS Teams webhook port if msteams is configured
+  // Start MS Teams bridge on host if msteams is configured
   if (process.env.MSTEAMS_APP_ID) {
     const msteamsPort = process.env.MSTEAMS_WEBHOOK_PORT || "3978";
+    // Stop any existing forward or bridge on this port
     runOpenshell(["forward", "stop", msteamsPort], { ignoreError: true });
-    runOpenshell(["forward", "start", "--background", msteamsPort, sandboxName], { ignoreError: true });
-    console.log(`  ✓ MS Teams webhook forwarded on port ${msteamsPort}`);
+    try {
+      execFileSync("pkill", ["-f", "msteams-bridge.js"], { stdio: "ignore" });
+    } catch { /* ignored */ }
+
+    const bridgePath = require("path").join(__dirname, "..", "..", "scripts", "msteams-bridge.js");
+    const bridgeEnv = {
+      ...process.env,
+      SANDBOX_NAME: sandboxName,
+      MSTEAMS_WEBHOOK_PORT: msteamsPort,
+    };
+    const bridgeProc = require("child_process").spawn("node", [bridgePath], {
+      env: bridgeEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
+    });
+    bridgeProc.unref();
+    bridgeProc.stdout.on("data", (d) => process.stdout.write(d));
+    bridgeProc.stderr.on("data", (d) => process.stderr.write(d));
+    console.log(`  ✓ MS Teams bridge started on port ${msteamsPort} (pid ${bridgeProc.pid})`);
   }
 
   // Register only after confirmed ready — prevents phantom entries
