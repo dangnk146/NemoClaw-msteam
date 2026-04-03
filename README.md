@@ -1,199 +1,193 @@
-# 🦞 NVIDIA NemoClaw: Reference Stack for Running OpenClaw in OpenShell with support MSTEAM
+# NemoClaw — MS Teams Edition
 
-<!-- start-badges -->
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue)](https://github.com/NVIDIA/NemoClaw/blob/main/LICENSE)
-[![Security Policy](https://img.shields.io/badge/Security-Report%20a%20Vulnerability-red)](https://github.com/NVIDIA/NemoClaw/blob/main/SECURITY.md)
-[![Project Status](https://img.shields.io/badge/status-alpha-orange)](https://github.com/NVIDIA/NemoClaw/blob/main/docs/about/release-notes.md)
-[![Discord](https://img.shields.io/badge/Discord-Join-7289da)](https://discord.gg/XFpfPv9Uvx)
-<!-- end-badges -->
+Fork của [NVIDIA/NemoClaw](https://github.com/NVIDIA/NemoClaw) với MS Teams bot support đầy đủ.
 
-<!-- start-intro -->
-NVIDIA NemoClaw is an open source reference stack that simplifies running [OpenClaw](https://openclaw.ai) always-on assistants more safely.
-It installs the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime, part of NVIDIA Agent Toolkit, which provides additional security for running autonomous agents.
-<!-- end-intro -->
+Chạy OpenClaw agent bên trong OpenShell sandbox, nhận và trả lời tin nhắn từ Microsoft Teams qua host-side bridge.
 
-> **Alpha software**
->
-> NemoClaw is available in early preview starting March 16, 2026.
-> This software is not production-ready.
-> Interfaces, APIs, and behavior may change without notice as we iterate on the design.
-> The project is shared to gather feedback and enable early experimentation.
-> We welcome issues and discussion from the community while the project evolves.
+---
 
-NemoClaw adds guided onboarding, a hardened blueprint, state management, messaging bridges, routed inference, and layered protection on top of the [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell) runtime. For the full feature list, refer to [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html). For the system diagram, component model, and blueprint lifecycle, refer to [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) and [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html).
+## Yêu cầu
 
-## Getting Started
+- Ubuntu 22.04+
+- Docker
+- Node.js >= 22.16.0
+- `openshell` CLI
+- Azure Bot Registration (App ID + App Password)
+- NVIDIA API Key (hoặc OpenAI API Key)
 
-Follow these steps to install NemoClaw and run your first sandboxed OpenClaw agent.
+---
 
-<!-- start-quickstart-guide -->
-
-### Prerequisites
-
-Before getting started, check the prerequisites to ensure you have the necessary software and hardware to run NemoClaw.
-
-#### Hardware
-
-| Resource | Minimum        | Recommended      |
-|----------|----------------|------------------|
-| CPU      | 4 vCPU         | 4+ vCPU          |
-| RAM      | 8 GB           | 16 GB            |
-| Disk     | 20 GB free     | 40 GB free       |
-
-The sandbox image is approximately 2.4 GB compressed. During image push, the Docker daemon, k3s, and the OpenShell gateway run alongside the export pipeline, which buffers decompressed layers in memory. On machines with less than 8 GB of RAM, this combined usage can trigger the OOM killer. If you cannot add memory, configuring at least 8 GB of swap can work around the issue at the cost of slower performance.
-
-#### Software
-
-| Dependency | Version                          |
-|------------|----------------------------------|
-| Linux      | Ubuntu 22.04 LTS or later |
-| Node.js    | 22.16 or later |
-| npm        | 10 or later |
-| Container runtime | Supported runtime installed and running |
-| [OpenShell](https://github.com/NVIDIA/OpenShell) | Installed |
-
-#### Container Runtimes
-
-| Platform | Supported runtimes | Notes |
-|----------|--------------------|-------|
-| Linux | Docker | Primary supported path. |
-| macOS (Apple Silicon) | Colima, Docker Desktop | Install Xcode Command Line Tools (`xcode-select --install`) and start the runtime before running the installer. |
-| macOS (Intel) | Podman | Not supported yet. Depends on OpenShell support for Podman on macOS. |
-| Windows WSL | Docker Desktop (WSL backend) | Supported target path. |
-| DGX Spark | Docker | Refer to the [DGX Spark setup guide](https://github.com/NVIDIA/NemoClaw/blob/main/spark-install.md) for cgroup v2 and Docker configuration. |
-
-### Install NemoClaw and Onboard OpenClaw Agent
-
-Download and run the installer script.
-The script installs Node.js if it is not already present, then runs the guided onboard wizard to create a sandbox, configure inference, and apply security policies.
-
-> **ℹ️ Note**
->
-> NemoClaw creates a fresh OpenClaw instance inside the sandbox during the onboarding process.
+## Cài đặt
 
 ```bash
-curl -fsSL https://www.nvidia.com/nemoclaw.sh | bash
+curl -fsSL https://raw.githubusercontent.com/dangnk146/NemoClaw-msteam/main/install.sh | bash
 ```
 
-If you use nvm or fnm to manage Node.js, the installer may not update your current shell's PATH.
-If `nemoclaw` is not found after install, run `source ~/.bashrc` (or `source ~/.zshrc` for zsh) or open a new terminal.
-
-When the install completes, a summary confirms the running environment:
-
-```text
-──────────────────────────────────────────────────
-Sandbox      my-assistant (Landlock + seccomp + netns)
-Model        nvidia/nemotron-3-super-120b-a12b (NVIDIA Endpoints)
-──────────────────────────────────────────────────
-Run:         nemoclaw my-assistant connect
-Status:      nemoclaw my-assistant status
-Logs:        nemoclaw my-assistant logs --follow
-──────────────────────────────────────────────────
-
-[INFO]  === Installation complete ===
-```
-
-### Chat with the Agent
-
-Connect to the sandbox, then chat with the agent through the TUI or the CLI.
+Sau khi cài xong, chạy onboarding:
 
 ```bash
-nemoclaw my-assistant connect
+nemoclaw onboard
 ```
 
-In the sandbox shell, open the OpenClaw terminal UI and start a chat:
+---
+
+## Cấu hình MS Teams
+
+### Bước 1 — Tạo Azure Bot
+
+1. Vào [Azure Portal](https://portal.azure.com) → **Azure Bot** → Create
+2. Chọn **Multi Tenant** hoặc **Single Tenant**
+3. Lưu lại:
+   - **App ID** (Microsoft App ID)
+   - **App Password** (Client Secret — tạo trong Certificates & secrets)
+   - **Tenant ID**
+
+### Bước 2 — Cấu hình NemoClaw
 
 ```bash
-openclaw tui
+nemoclaw setup-msteams
 ```
 
-Alternatively, send a single message and print the response:
+Wizard sẽ hỏi App ID, App Password, Tenant ID và các policy.
+
+Hoặc set env vars thủ công:
 
 ```bash
-openclaw agent --agent main --local -m "hello" --session-id test
+export MSTEAMS_APP_ID=<your-app-id>
+export MSTEAMS_APP_PASSWORD=<your-app-password>
+export MSTEAMS_TENANT_ID=<your-tenant-id>
+export MSTEAMS_WEBHOOK_PORT=3978
+export MSTEAMS_WEBHOOK_PATH=/api/messages
+export SANDBOX_NAME=kiloba        # tên sandbox của bạn
+export NVIDIA_API_KEY=<your-key>  # hoặc OPENAI_API_KEY
 ```
 
-### Uninstall
-
-To remove NemoClaw and all resources created during setup, run the uninstall script:
+### Bước 3 — Start bridge
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NVIDIA/NemoClaw/refs/heads/main/uninstall.sh | bash
+nemoclaw start
 ```
 
-| Flag               | Effect                                              |
-|--------------------|-----------------------------------------------------|
-| `--yes`            | Skip the confirmation prompt.                       |
-| `--keep-openshell` | Leave the `openshell` binary installed.              |
-| `--delete-models`  | Also remove NemoClaw-pulled Ollama models.           |
+Bridge sẽ lắng nghe tại `http://0.0.0.0:3978/api/messages`.
 
-For troubleshooting installation or onboarding issues, see the [Troubleshooting guide](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html).
+Kiểm tra trạng thái:
 
-<!-- end-quickstart-guide -->
-
-## Documentation
-
-Refer to the following pages on the official documentation website for more information on NemoClaw.
-
-| Page | Description |
-|------|-------------|
-| [Overview](https://docs.nvidia.com/nemoclaw/latest/about/overview.html) | What NemoClaw does and how it fits together. |
-| [How It Works](https://docs.nvidia.com/nemoclaw/latest/about/how-it-works.html) | Plugin, blueprint, sandbox lifecycle, and protection layers. |
-| [Architecture](https://docs.nvidia.com/nemoclaw/latest/reference/architecture.html) | Plugin structure, blueprint lifecycle, sandbox environment, and host-side state. |
-| [Inference Profiles](https://docs.nvidia.com/nemoclaw/latest/reference/inference-profiles.html) | Supported providers, validation, and routed inference configuration. |
-| [Network Policies](https://docs.nvidia.com/nemoclaw/latest/reference/network-policies.html) | Baseline rules, operator approval flow, and egress control. |
-| [Customize Network Policy](https://docs.nvidia.com/nemoclaw/latest/network-policy/customize-network-policy.html) | Static and dynamic policy changes, presets. |
-| [Security Best Practices](https://docs.nvidia.com/nemoclaw/latest/security/best-practices.html) | Controls reference, risk framework, and posture profiles for sandbox security. |
-| [Sandbox Hardening](https://docs.nvidia.com/nemoclaw/latest/deployment/sandbox-hardening.html) | Container security measures, capability drops, process limits. |
-| [CLI Commands](https://docs.nvidia.com/nemoclaw/latest/reference/commands.html) | Full NemoClaw CLI command reference. |
-| [Troubleshooting](https://docs.nvidia.com/nemoclaw/latest/reference/troubleshooting.html) | Common issues and resolution steps. |
-
-## Project Structure
-
-The following directories make up the NemoClaw repository.
-
-```text
-NemoClaw/
-├── bin/              # CLI entry point and library modules (CJS)
-├── nemoclaw/         # TypeScript plugin (Commander CLI extension)
-│   └── src/
-│       ├── blueprint/    # Runner, snapshot, SSRF validation, state
-│       ├── commands/     # Slash commands, migration state
-│       └── onboard/      # Onboarding config
-├── nemoclaw-blueprint/   # Blueprint YAML and network policies
-├── scripts/          # Install helpers, setup, automation
-├── test/             # Integration and E2E tests
-└── docs/             # User-facing docs (Sphinx/MyST)
+```bash
+nemoclaw status
 ```
 
-## Community
+### Bước 4 — Expose port ra internet
 
-Join the NemoClaw community to ask questions, share feedback, and report issues.
+Teams cần gọi được vào webhook endpoint. Dùng cloudflared (tự động) hoặc ngrok:
 
-- [Discord](https://discord.gg/XFpfPv9Uvx)
-- [GitHub Discussions](https://github.com/NVIDIA/NemoClaw/discussions)
-- [GitHub Issues](https://github.com/NVIDIA/NemoClaw/issues)
+```bash
+# cloudflared được start tự động bởi nemoclaw start nếu đã cài
+# Hoặc dùng ngrok thủ công:
+ngrok http 3978
+```
 
-## Contributing
+Lấy URL public (ví dụ `https://abc123.ngrok.io`).
 
-We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards, and the PR process.
+### Bước 5 — Set Messaging Endpoint trên Azure
 
-## Security
+1. Vào Azure Portal → Azure Bot của bạn → **Configuration**
+2. Set **Messaging endpoint**: `https://<your-public-url>/api/messages`
+3. Save
 
-NVIDIA takes security seriously.
-If you discover a vulnerability in NemoClaw, **DO NOT open a public issue.**
-Use one of the private reporting channels described in [SECURITY.md](SECURITY.md):
+### Bước 6 — Thêm bot vào Teams
 
-- Submit a report through the [NVIDIA Vulnerability Disclosure Program](https://www.nvidia.com/en-us/security/report-vulnerability/).
-- Send an email to [psirt@nvidia.com](mailto:psirt@nvidia.com) encrypted with the [NVIDIA PGP key](https://www.nvidia.com/en-us/security/pgp-key).
-- Use [GitHub's private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configuring-private-vulnerability-reporting-for-a-repository) to submit a report directly on this repository.
+1. Vào Azure Portal → Azure Bot → **Channels** → Add **Microsoft Teams**
+2. Mở Teams → Apps → tìm bot theo App ID
+3. Gửi tin nhắn cho bot
 
-For security bulletins and PSIRT policies, visit the [NVIDIA Product Security](https://www.nvidia.com/en-us/security/) portal.
+---
 
-## Notice and Disclaimer
+## Kiến trúc
 
-This software automatically retrieves, accesses or interacts with external materials. Those retrieved materials are not distributed with this software and are governed solely by separate terms, conditions and licenses. You are solely responsible for finding, reviewing and complying with all applicable terms, conditions, and licenses, and for verifying the security, integrity and suitability of any retrieved materials for your specific use case. This software is provided "AS IS", without warranty of any kind. The author makes no representations or warranties regarding any retrieved materials, and assumes no liability for any losses, damages, liabilities or legal consequences from your use or inability to use this software or any retrieved materials. Use this software and the retrieved materials at your own risk.
+```
+Microsoft Teams
+      │
+      │  HTTPS webhook POST
+      ▼
+[msteams-bridge.js]  ← chạy trên HOST
+      │
+      │  SSH → openshell sandbox connect
+      ▼
+[OpenShell Sandbox]
+      │
+      └─ OpenClaw agent (inference → NVIDIA/OpenAI)
+      │
+      └─ Reply qua Bot Framework REST API
+            │
+            ▼
+      Microsoft Teams
+```
+
+Bridge chạy **trên host** (không phải trong sandbox) — giống pattern của Telegram bridge. Không cần outbound connection từ sandbox cho Teams messaging.
+
+---
+
+## Quản lý sandbox
+
+```bash
+# Xem danh sách sandbox
+nemoclaw list
+
+# Kết nối vào sandbox
+nemoclaw kiloba connect
+
+# Xem logs
+nemoclaw kiloba logs --follow
+
+# Xem status
+nemoclaw kiloba status
+
+# Xóa sandbox
+nemoclaw kiloba destroy
+```
+
+---
+
+## Services
+
+```bash
+nemoclaw start    # start tất cả services (Teams bridge, Telegram bridge, cloudflared)
+nemoclaw stop     # stop tất cả
+nemoclaw status   # xem trạng thái
+```
+
+Log của bridge:
+
+```bash
+tail -f /tmp/nemoclaw-services-<sandbox-name>/msteams-bridge.log
+```
+
+---
+
+## Troubleshooting
+
+**Bot không nhận được tin nhắn từ Teams**
+- Kiểm tra Messaging endpoint đã set đúng chưa trên Azure Portal
+- Kiểm tra port 3978 có được expose ra internet không: `curl https://<your-url>/api/messages`
+- Xem log bridge: `tail -f /tmp/nemoclaw-services-*/msteams-bridge.log`
+
+**Bot nhận được tin nhắn nhưng không reply**
+- Kiểm tra sandbox đang chạy: `nemoclaw status`
+- Kiểm tra NVIDIA_API_KEY đã set chưa
+- Xem log sandbox: `nemoclaw kiloba logs --follow`
+
+**Lỗi EACCES khi openclaw update**
+- Đã được fix trong version này — `NPM_CONFIG_PREFIX=/sandbox/.npm-global`
+- Nếu vẫn lỗi: `npm config set prefix /sandbox/.npm-global` trong sandbox
+
+**Rebuild sandbox sau khi thay đổi config**
+
+```bash
+nemoclaw onboard
+```
+
+---
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE).
+Apache 2.0 — xem [LICENSE](LICENSE)
