@@ -1,4 +1,4 @@
-# 🦞 NVIDIA NemoClaw: Reference Stack for Running OpenClaw in OpenShell
+# 🦞 NVIDIA NemoClaw: Reference Stack for Running OpenClaw in OpenShell with support MSTEAM
 
 <!-- start-badges -->
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue)](https://github.com/NVIDIA/NemoClaw/blob/main/LICENSE)
