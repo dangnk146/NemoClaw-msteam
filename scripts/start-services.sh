@@ -97,7 +97,7 @@ stop_service() {
 show_status() {
   mkdir -p "$PIDDIR"
   echo ""
-  for svc in telegram-bridge cloudflared; do
+  for svc in telegram-bridge msteams-bridge cloudflared; do
     if is_running "$svc"; then
       echo -e "  ${GREEN}●${NC} $svc  (PID $(cat "$PIDDIR/$svc.pid"))"
     else
@@ -118,6 +118,7 @@ show_status() {
 do_stop() {
   mkdir -p "$PIDDIR"
   stop_service cloudflared
+  stop_service msteams-bridge
   stop_service telegram-bridge
   info "All services stopped."
 }
@@ -155,6 +156,22 @@ do_start() {
   if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${NVIDIA_API_KEY:-}" ]; then
     SANDBOX_NAME="$SANDBOX_NAME" start_service telegram-bridge \
       node "$REPO_DIR/scripts/telegram-bridge.js"
+  fi
+
+  # MS Teams bridge (host-side — receives Bot Framework webhooks, forwards to sandbox)
+  if [ -n "${MSTEAMS_APP_ID:-}" ] && [ -n "${MSTEAMS_APP_PASSWORD:-}" ]; then
+    SANDBOX_NAME="$SANDBOX_NAME" \
+    MSTEAMS_APP_ID="$MSTEAMS_APP_ID" \
+    MSTEAMS_APP_PASSWORD="$MSTEAMS_APP_PASSWORD" \
+    MSTEAMS_TENANT_ID="${MSTEAMS_TENANT_ID:-common}" \
+    MSTEAMS_WEBHOOK_PORT="${MSTEAMS_WEBHOOK_PORT:-3978}" \
+    MSTEAMS_WEBHOOK_PATH="${MSTEAMS_WEBHOOK_PATH:-/api/messages}" \
+    NVIDIA_API_KEY="${NVIDIA_API_KEY:-}" \
+    start_service msteams-bridge \
+      node "$REPO_DIR/scripts/msteams-bridge.js"
+  else
+    warn "MSTEAMS_APP_ID / MSTEAMS_APP_PASSWORD not set — MS Teams bridge will not start."
+    warn "Run: nemoclaw setup-msteams"
   fi
 
   # cloudflared tunnel — disabled by default for security.
@@ -200,6 +217,12 @@ do_start() {
     echo "  │  Telegram:    bridge running                        │"
   else
     echo "  │  Telegram:    not started (no token)                │"
+  fi
+
+  if is_running msteams-bridge; then
+    echo "  │  MS Teams:    bridge running (:${MSTEAMS_WEBHOOK_PORT:-3978})              │"
+  else
+    echo "  │  MS Teams:    not started (no credentials)          │"
   fi
 
   echo "  │                                                     │"
