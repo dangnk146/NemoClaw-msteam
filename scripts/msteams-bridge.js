@@ -189,6 +189,8 @@ function runAgentInSandbox(message, sessionId) {
   });
 }
 
+const BIND_HOST  = process.env.MSTEAMS_BIND_HOST || "127.0.0.1";
+
 // ── Webhook server ────────────────────────────────────────────────
 
 const busyConversations = new Set();
@@ -249,16 +251,16 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, BIND_HOST, () => {
   console.log("");
   console.log("  ┌─────────────────────────────────────────────────────┐");
   console.log("  │  NemoClaw MS Teams Bridge                           │");
   console.log("  │                                                     │");
-  console.log(`  │  Listening: http://0.0.0.0:${PORT}${PATH_PREFIX.padEnd(24)}│`);
+  console.log(`  │  Listening: http://${BIND_HOST}:${PORT}${PATH_PREFIX.padEnd(16)}│`);
   console.log(`  │  Sandbox:   ${(SANDBOX + "                              ").slice(0, 40)}│`);
   console.log("  │                                                     │");
-  console.log("  │  Set Azure Bot messaging endpoint to:               │");
-  console.log(`  │  https://<your-host>:${PORT}${PATH_PREFIX.padEnd(20)}    │`);
+  console.log("  │  Expose via reverse proxy or ngrok:                 │");
+  console.log(`  │  ngrok http ${PORT}                                    │`);
   console.log("  └─────────────────────────────────────────────────────┘");
   console.log("");
 });

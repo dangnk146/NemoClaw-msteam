@@ -157,16 +157,19 @@ do_start() {
       node "$REPO_DIR/scripts/telegram-bridge.js"
   fi
 
-  # 3. cloudflared tunnel
-  if command -v cloudflared >/dev/null 2>&1; then
-    start_service cloudflared \
-      cloudflared tunnel --url "http://localhost:$DASHBOARD_PORT"
-  else
-    warn "cloudflared not found — no public URL. Install: brev-setup.sh or manually."
+  # cloudflared tunnel — disabled by default for security.
+  # Enable with: NEMOCLAW_CLOUDFLARED=1 nemoclaw start
+  if [ "${NEMOCLAW_CLOUDFLARED:-0}" = "1" ]; then
+    if command -v cloudflared >/dev/null 2>&1; then
+      start_service cloudflared \
+        cloudflared tunnel --url "http://localhost:$DASHBOARD_PORT"
+    else
+      warn "cloudflared not found — skipping tunnel."
+    fi
   fi
 
-  # Wait for cloudflared to publish URL
-  if is_running cloudflared; then
+  # Wait for cloudflared URL if enabled
+  if [ "${NEMOCLAW_CLOUDFLARED:-0}" = "1" ] && is_running cloudflared; then
     info "Waiting for tunnel URL..."
     for _ in $(seq 1 15); do
       local url
@@ -185,7 +188,7 @@ do_start() {
   echo "  │                                                     │"
 
   local tunnel_url=""
-  if [ -f "$PIDDIR/cloudflared.log" ]; then
+  if [ "${NEMOCLAW_CLOUDFLARED:-0}" = "1" ] && [ -f "$PIDDIR/cloudflared.log" ]; then
     tunnel_url="$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$PIDDIR/cloudflared.log" 2>/dev/null | head -1 || true)"
   fi
 
