@@ -774,7 +774,28 @@ async function start() {
   const safeName =
     defaultSandbox && /^[a-zA-Z0-9._-]+$/.test(defaultSandbox) ? defaultSandbox : null;
   const sandboxEnv = safeName ? `SANDBOX_NAME=${shellQuote(safeName)}` : "";
-  run(`${sandboxEnv} bash "${SCRIPTS}/start-services.sh"`);
+
+  // Load MS Teams credentials from openclaw.json into process.env
+  // so start-services.sh can pick them up via inherited environment.
+  const { loadMsteamsEnv } = require("./lib/msteams-setup");
+  loadMsteamsEnv();
+
+  // Build env string for msteams vars (only if set after loadMsteamsEnv)
+  const msteamsVars = [
+    "MSTEAMS_APP_ID",
+    "MSTEAMS_APP_PASSWORD",
+    "MSTEAMS_TENANT_ID",
+    "MSTEAMS_DM_POLICY",
+    "MSTEAMS_GROUP_POLICY",
+    "MSTEAMS_ALLOW_FROM",
+    "MSTEAMS_WEBHOOK_PORT",
+    "MSTEAMS_WEBHOOK_PATH",
+  ]
+    .filter((k) => process.env[k])
+    .map((k) => `${k}=${shellQuote(process.env[k])}`)
+    .join(" ");
+
+  run(`${sandboxEnv} ${msteamsVars} bash "${SCRIPTS}/start-services.sh"`);
 }
 
 function stop() {

@@ -190,7 +190,16 @@ RUN mkdir -p /sandbox/.openclaw-data/credentials \
     && ([ -e /sandbox/.openclaw/credentials ] || ln -s /sandbox/.openclaw-data/credentials /sandbox/.openclaw/credentials) \
     && touch /sandbox/.openclaw-data/exec-approvals.json \
     && chown sandbox:sandbox /sandbox/.openclaw-data/exec-approvals.json \
-    && ([ -e /sandbox/.openclaw/exec-approvals.json ] || ln -s /sandbox/.openclaw-data/exec-approvals.json /sandbox/.openclaw/exec-approvals.json)
+    && ([ -e /sandbox/.openclaw/exec-approvals.json ] || ln -s /sandbox/.openclaw-data/exec-approvals.json /sandbox/.openclaw/exec-approvals.json) \
+    && mkdir -p /sandbox/.openclaw-data/skills \
+    && chown sandbox:sandbox /sandbox/.openclaw-data/skills \
+    && ([ -e /sandbox/.openclaw/skills ] || ln -s /sandbox/.openclaw-data/skills /sandbox/.openclaw/skills) \
+    && mkdir -p /sandbox/.openclaw-data/hooks \
+    && chown sandbox:sandbox /sandbox/.openclaw-data/hooks \
+    && ([ -e /sandbox/.openclaw/hooks ] || ln -s /sandbox/.openclaw-data/hooks /sandbox/.openclaw/hooks) \
+    && mkdir -p /sandbox/.openclaw-data/extensions \
+    && chown sandbox:sandbox /sandbox/.openclaw-data/extensions \
+    && ([ -e /sandbox/.openclaw/extensions ] || ln -s /sandbox/.openclaw-data/extensions /sandbox/.openclaw/extensions)
 RUN chown root:root /sandbox/.openclaw \
     && find /sandbox/.openclaw -mindepth 1 -maxdepth 1 -exec chown -h root:root {} + \
     && chmod 755 /sandbox/.openclaw \
